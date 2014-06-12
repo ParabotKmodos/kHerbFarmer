@@ -59,7 +59,7 @@ public class kHerbFarmer extends Script implements Paintable{
 
 	private final int OBJ_DEPOSIT = 9398;
 
-	private final int INTER_BANK = 0;
+	private final int INTER_BANK = 23350;
 
 	private final int[] RANDOMS = { 410, 1091, 3117, 3022 };
 
@@ -148,8 +148,8 @@ public class kHerbFarmer extends Script implements Paintable{
 
 	private final BasicStroke stroke1 = new BasicStroke(1);
 
-	private final Font font1 = new Font("Arial", 0, 11);
-	private final Font font2 = new Font("Arial", 0, 9);
+	private final Font font1 = new Font("Arial", 0, 12);
+	private final Font font2 = new Font("Arial", 0, 10);
 
 	@Override
 	public void paint(Graphics g1) {
