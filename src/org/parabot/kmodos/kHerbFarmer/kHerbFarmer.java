@@ -213,8 +213,8 @@ public class kHerbFarmer extends Script implements Paintable{
 		public void execute() {
 			SceneObject patch = SceneObjects.getClosest(OBJ_PATCH);
 			if(patch != null){
-				Menu.sendAction(447, 5302, 27, 3214);
-				sleep(150,200);
+				Menu.sendAction(447, herb.seedID-1, 27, 3214);
+				sleep(500,750);
 				Menu.sendAction(62, patch.getHash(), patch.getLocalRegionX(), patch.getLocalRegionY());
 				sleep(5000,6000);
 			}
