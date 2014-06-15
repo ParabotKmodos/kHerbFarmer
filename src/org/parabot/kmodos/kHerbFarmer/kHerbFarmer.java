@@ -19,6 +19,7 @@ import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
+
 import org.parabot.environment.api.interfaces.Paintable;
 import org.parabot.environment.api.utils.Time;
 import org.parabot.environment.api.utils.Timer;
@@ -43,10 +44,29 @@ import org.rev317.min.api.wrappers.Tile;
 @ScriptManifest(author = "Kmodos", category = Category.FARMING, description = "Farms all herbs and banks them for exp and cash", name = "kHerbFarmer", servers = { "PKHonor" }, version = 1)
 public class kHerbFarmer extends Script implements Paintable{
 
+	/*FARMING AREAS*/
+	private final int[] TP_HERB_AREA_FALADOR = {662, 0, 2495, 315};
+	private final int[] TP_HERB_AREA_PORT = {663, 0, 2495, 315};
+	private final int[] TP_HERB_AREA_CATHERBY = {664, 47, 2495, 315};
+	private final int[] TP_HERB_AREA_ARDY = {665, 478, 2495 ,315};
+
+	private final int[] TP_PORT = {662, 0, 2495, 315};
+	private final int[] TP_CATHERBY = {663, 0, 2496, 315};
+	private final int[] TP_ARDY = {664, 0, 2497, 315};
+	private final int[] TP_FALADOR = {665, 0, 2494, 315};
+
+	private final FarmingArea FALADOR = new FarmingArea(new Area(new Tile(3045, 3316), new Tile(3062, 3316), new Tile(3062, 3300), new Tile(3045, 3300)), 2323, TP_HERB_AREA_FALADOR, TP_PORT);
+	private final FarmingArea PORT = new FarmingArea(new Area(new Tile(3593, 3535), new Tile(3593, 3517), new Tile(3609, 3517), new Tile(3609, 3535)), 2326, TP_HERB_AREA_PORT, TP_CATHERBY);
+	private final FarmingArea CATHERBY = new FarmingArea(new Area(new Tile(2800, 3474), new Tile(2800, 3456), new Tile(2817, 3456), new Tile(2817, 3474)), 2324, TP_HERB_AREA_CATHERBY, TP_ARDY);
+	private final FarmingArea ARDY = new FarmingArea(new Area(new Tile(2655, 3384), new Tile(2655,3365), new Tile(2676, 3365), new Tile(2676, 3384)), 2325, TP_HERB_AREA_ARDY,TP_FALADOR);
+
+	private final FarmingArea[] areas = {FALADOR, PORT, CATHERBY, ARDY};
 	/*VARS*/
 
+	private FarmingArea currentArea;
+
 	private Timer timer = new Timer();
-	
+
 	private boolean showPaint = false;
 
 	private int herbsFarmed = 0;
@@ -60,6 +80,8 @@ public class kHerbFarmer extends Script implements Paintable{
 	private final int OBJ_DEPOSIT = 9398;
 
 	private final int INTER_BANK = 23350;
+
+	private final int INTERFACE_TELEPORT_HERB = 2492;
 
 	private final int[] RANDOMS = { 410, 1091, 3117, 3022 };
 
@@ -123,17 +145,18 @@ public class kHerbFarmer extends Script implements Paintable{
 		map.put(STRING_TORSTOL, torstol);
 
 		GUI g = new GUI();
-		
+
 		while(g.isVisible()){
 			Time.sleep(100);
 		}
 		showPaint = true;
-		
+		currentArea = getArea();
 		strats.add(new Antis());
 		strats.add(new Relog());
 		strats.add(new Pick());
 		strats.add(new Plant());
 		strats.add(new BankHerbs());
+		strats.add(new Teleport());
 		provide(strats);
 		return true;
 	}
@@ -210,7 +233,7 @@ public class kHerbFarmer extends Script implements Paintable{
 			SceneObject grownPlot = SceneObjects.getClosest(OBJ_GROWN);
 			if(grownPlot != null){
 				Menu.sendAction(502, grownPlot.getHash(), grownPlot.getLocalRegionX(), grownPlot.getLocalRegionY());
-				sleep(1200,1300);
+				sleep(1400,1500);
 			}
 		}
 
@@ -239,6 +262,50 @@ public class kHerbFarmer extends Script implements Paintable{
 				herbsFarmed += Inventory.getCount(true, herb.herbID);
 				Menu.sendAction(432, herb.herbID - 1, 0, 5064);
 				Time.sleep(1500, 2000);
+			}
+		}
+
+	}
+
+	public class Teleport implements Strategy{
+
+		@Override
+		public boolean activate() {
+			return Inventory.getCount(true, herb.herbID) == 0 && SceneObjects.getClosest(OBJ_PATCH) == null && SceneObjects.getClosest(OBJ_GROWN) == null;
+		}
+
+		@Override
+		public void execute() {
+			Npc farmer = Npcs.getNearest(currentArea.npcId)[0];
+			if(farmer!= null){
+				Menu.sendAction(20, farmer.getIndex(), 0, 0);
+				Time.sleep(new SleepCondition() {
+
+					@Override
+					public boolean isValid() {
+						return Loader.getClient().getBackDialogId() == INTERFACE_TELEPORT_HERB;
+					}
+				}, 2000);
+				Time.sleep(1000,2000);
+				Menu.sendAction(currentArea.herbTp[3], currentArea.herbTp[0], currentArea.herbTp[1], currentArea.herbTp[2]);
+				Time.sleep(new SleepCondition() {
+
+					@Override
+					public boolean isValid() {
+						return Loader.getClient().getBackDialogId() == INTERFACE_TELEPORT_HERB;
+					}
+				}, 2000);
+				Time.sleep(1000,2000);
+				Menu.sendAction(currentArea.nextTp[3], currentArea.nextTp[0], currentArea.nextTp[1], currentArea.nextTp[2]);
+				Time.sleep(new SleepCondition() {
+					
+					@Override
+					public boolean isValid() {
+						return !currentArea.area.contains(Players.getMyPlayer().getLocation());
+					}
+				}, 10000);
+				currentArea = getArea();
+				Time.sleep(1500,1600);
 			}
 		}
 
@@ -335,6 +402,17 @@ public class kHerbFarmer extends Script implements Paintable{
 				sleep(6000);
 			}
 		}
+	}
+
+	public FarmingArea getArea(){
+		for(int i = 0; i < areas.length; i++){
+			if(areas[i].area.contains(Players.getMyPlayer().getLocation())){
+				return areas[i];
+			}
+		}
+		System.out.println("You are not in a farming area!");
+		System.exit(1);
+		return null;
 	}
 
 	/**
@@ -464,5 +542,17 @@ public class kHerbFarmer extends Script implements Paintable{
 		}
 	}
 
+	private class FarmingArea {
+		public Area area;
+		public int npcId;
+		public int[] nextTp;
+		public int[] herbTp;
+		public FarmingArea(Area area, int npcId, int[] herbTp, int[] nextTp){
+			this.area = area;
+			this.npcId = npcId;
+			this.nextTp = nextTp;
+			this.herbTp = herbTp;
+		}
+	}
 
 }
