@@ -15,6 +15,7 @@ import java.util.HashMap;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -30,18 +31,20 @@ import org.parabot.environment.scripts.Category;
 import org.parabot.environment.scripts.framework.SleepCondition;
 import org.parabot.environment.scripts.framework.Strategy;
 import org.rev317.min.Loader;
+import org.rev317.min.api.methods.GroundItems;
 import org.rev317.min.api.methods.Inventory;
 import org.rev317.min.api.methods.Menu;
 import org.rev317.min.api.methods.Npcs;
 import org.rev317.min.api.methods.Players;
 import org.rev317.min.api.methods.SceneObjects;
 import org.rev317.min.api.methods.Skill;
+import org.rev317.min.api.wrappers.GroundItem;
 import org.rev317.min.api.wrappers.Npc;
 import org.rev317.min.api.wrappers.SceneObject;
 import org.rev317.min.api.wrappers.Tile;
 
 
-@ScriptManifest(author = "Kmodos", category = Category.FARMING, description = "Farms all herbs and banks them for exp and cash", name = "kHerbFarmer", servers = { "PKHonor" }, version = 1)
+@ScriptManifest(author = "Kmodos", category = Category.FARMING, description = "Farms all herbs and banks them for exp and cash", name = "kHerbFarmer", servers = { "PKHonor" }, version = 3)
 public class kHerbFarmer extends Script implements Paintable{
 
 	/*FARMING AREAS*/
@@ -73,6 +76,8 @@ public class kHerbFarmer extends Script implements Paintable{
 
 	private Herb herb;
 
+	private boolean useCompost = false;
+
 	private final int OBJ_PATCH = 8132;
 
 	private final int OBJ_GROWN = 8143;
@@ -80,6 +85,10 @@ public class kHerbFarmer extends Script implements Paintable{
 	private final int OBJ_DEPOSIT = 9398;
 
 	private final int INTER_BANK = 23350;
+
+	private final int ITEM_COMPOST = 6035;
+
+	private final int INTERFACE_SHOP = 3824;
 
 	private final int INTERFACE_TELEPORT_HERB = 2492;
 
@@ -156,6 +165,8 @@ public class kHerbFarmer extends Script implements Paintable{
 		strats.add(new Pick());
 		strats.add(new Plant());
 		strats.add(new BankHerbs());
+		strats.add(new PickupExtras());
+		strats.add(new BuyCompost());
 		strats.add(new Teleport());
 		provide(strats);
 		return true;
@@ -193,6 +204,7 @@ public class kHerbFarmer extends Script implements Paintable{
 			g.drawString("Herbs Farmed: " + herbsFarmed, 563, 350);
 			g.drawString("Herbs/Hour: " + timer.getPerHour(herbsFarmed), 563, 375);
 			g.drawString("Herb: " + herb.name, 563, 400);
+			g.drawString("Using Compost: " + useCompost, 563, 425);
 		}
 	}
 
@@ -213,10 +225,39 @@ public class kHerbFarmer extends Script implements Paintable{
 		public void execute() {
 			SceneObject patch = SceneObjects.getClosest(OBJ_PATCH);
 			if(patch != null){
+				if(useCompost){
+					while(Inventory.getCount(true, ITEM_COMPOST) > 0){
+						Menu.sendAction(447, ITEM_COMPOST - 1, 0, 3214);
+						sleep(500,750);
+						Menu.sendAction(62, patch.getHash(), patch.getLocalRegionX(), patch.getLocalRegionY());
+						Time.sleep(new SleepCondition() {
+
+							@Override
+							public boolean isValid() {
+								return Inventory.getCount(true, ITEM_COMPOST) == 0;
+							}
+						}, 1000);
+						if(Inventory.getCount(true, ITEM_COMPOST) == 0){
+							Menu.sendAction(847 ,1925, 0, 3214);
+							Time.sleep(new SleepCondition() {
+
+								@Override
+								public boolean isValid() {
+									return Inventory.getCount(true, 1926) == 0;
+								}
+							},1500);
+						}
+					}
+				}
 				Menu.sendAction(447, herb.seedID-1, 27, 3214);
 				sleep(500,750);
 				Menu.sendAction(62, patch.getHash(), patch.getLocalRegionX(), patch.getLocalRegionY());
-				sleep(5000,6000);
+				Time.sleep(new SleepCondition() {
+					@Override
+					public boolean isValid() {
+						return SceneObjects.getClosest(OBJ_PATCH) == null;
+					}
+				}, 6000);
 			}
 		}
 	}
@@ -260,7 +301,7 @@ public class kHerbFarmer extends Script implements Paintable{
 					}
 				}, 5000);
 				herbsFarmed += Inventory.getCount(true, herb.herbID);
-				Menu.sendAction(432, herb.herbID - 1, 0, 5064);
+				Menu.sendAction(432, herb.herbID - 1, getFirstHerbSlot(), 5064);
 				Time.sleep(1500, 2000);
 			}
 		}
@@ -298,7 +339,7 @@ public class kHerbFarmer extends Script implements Paintable{
 				Time.sleep(1000,2000);
 				Menu.sendAction(currentArea.nextTp[3], currentArea.nextTp[0], currentArea.nextTp[1], currentArea.nextTp[2]);
 				Time.sleep(new SleepCondition() {
-					
+
 					@Override
 					public boolean isValid() {
 						return !currentArea.area.contains(Players.getMyPlayer().getLocation());
@@ -306,6 +347,56 @@ public class kHerbFarmer extends Script implements Paintable{
 				}, 10000);
 				currentArea = getArea();
 				Time.sleep(1500,1600);
+			}
+		}
+
+	}
+
+	public class PickupExtras implements Strategy{
+
+		@Override
+		public boolean activate() {
+			return GroundItems.getNearest(herb.herbID - 1).length > 0;
+		}
+
+		@Override
+		public void execute() {
+			System.out.println("Picking up");
+			for(GroundItem g: GroundItems.getNearest(herb.herbID-1)){
+				Menu.sendAction(234, herb.herbID - 1, g.getLocation().getRegionX(), g.getLocation().getRegionY());
+				Time.sleep(150,250);
+			}
+			Time.sleep(1400, 1500);
+		}
+
+	}
+
+	public class BuyCompost implements Strategy{
+
+		@Override
+		public boolean activate() {
+			return useCompost && Inventory.getCount(true, 996) > 89 && !(Inventory.getCount(true, ITEM_COMPOST) > 0) && Inventory.getCount(true, herb.herbID) == 0 && SceneObjects.getClosest(OBJ_PATCH) == null && SceneObjects.getClosest(OBJ_GROWN) == null;
+		}
+
+		@Override
+		public void execute() {
+			Npc farmer = Npcs.getNearest(getArea().npcId)[0];
+			if(farmer != null){
+				Menu.sendAction(225, farmer.getIndex(), 0, 0);
+				Time.sleep(new SleepCondition() {
+					@Override
+					public boolean isValid() {
+						return Loader.getClient().getOpenInterfaceId() == INTERFACE_SHOP;
+					}
+				}, 15000);
+				Menu.sendAction(78, 6034, 7, 3900);
+				Time.sleep(new SleepCondition() {
+					
+					@Override
+					public boolean isValid() {
+						return Inventory.getCount(true, ITEM_COMPOST) > 0;
+					}
+				}, 5000);
 			}
 		}
 
@@ -493,6 +584,9 @@ public class kHerbFarmer extends Script implements Paintable{
 		private JButton start;
 		private Container cont;
 		private Container herbCont;
+		private Container compostCont;
+		private JCheckBox compost;
+		private JLabel compostLabel;
 		private JComboBox<String> herbSelector;
 		private JLabel herbLabel;
 
@@ -500,11 +594,12 @@ public class kHerbFarmer extends Script implements Paintable{
 
 		private final String TITLE = "kHerbFarmer";
 		private final int WIDTH = 200;
-		private final int HIEGHT = 75;
+		private final int HIEGHT = 95;
 
 		public GUI(){
 			cont = new Container();
 			herbCont = new Container();
+			compostCont = new Container();
 
 			setDefaultCloseOperation(EXIT_ON_CLOSE);
 			setSize(WIDTH, HIEGHT);
@@ -512,18 +607,26 @@ public class kHerbFarmer extends Script implements Paintable{
 			setResizable(false);
 
 			herbSelector = new JComboBox<>(herbs);
-			herbLabel = new JLabel(" Herbs: ");
+			herbLabel = new JLabel(" Herb: ");
+			
+			compost = new JCheckBox();
+			compostLabel = new JLabel(" Use Compost: ");
 
 			start = new JButton("Start");
 			start.addActionListener(this);
 
 			herbCont.setLayout(new BoxLayout(herbCont, BoxLayout.X_AXIS));
+			compostCont.setLayout(new BoxLayout(compostCont, BoxLayout.X_AXIS));
 			cont.setLayout(new BoxLayout(cont, BoxLayout.Y_AXIS));
 
 			herbCont.add(herbLabel);
 			herbCont.add(herbSelector);
 
+			compostCont.add(compostLabel);
+			compostCont.add(compost);
+			
 			cont.add(herbCont);
+			cont.add(compostCont);
 			cont.add(start);
 
 			add(cont);
@@ -535,6 +638,7 @@ public class kHerbFarmer extends Script implements Paintable{
 		public void actionPerformed(ActionEvent e) {
 			if(e.getSource().equals(start)){
 				herb = map.get(herbSelector.getSelectedItem());
+				useCompost = compost.isSelected();
 				setVisible(false);
 				dispose();
 				timer = new org.parabot.environment.api.utils.Timer();
@@ -553,6 +657,10 @@ public class kHerbFarmer extends Script implements Paintable{
 			this.nextTp = nextTp;
 			this.herbTp = herbTp;
 		}
+	}
+
+	private int getFirstHerbSlot(){
+		return Inventory.getItems(herb.herbID)[0].getSlot();
 	}
 
 }
