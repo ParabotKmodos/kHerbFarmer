@@ -92,7 +92,7 @@ public class kHerbFarmer extends Script implements Paintable{
 
 	private final int INTERFACE_TELEPORT_HERB = 2492;
 
-	private final int[] RANDOMS = { 410, 1091, 3117, 3022 };
+	private final int[] RANDOMS = {  410, 1091, 3117, 3022, 3351, 409 };
 
 	private final long EXP_START = Skill.FARMING.getExperience();
 
@@ -456,7 +456,7 @@ public class kHerbFarmer extends Script implements Paintable{
 				}
 				System.out.println("Bob's Island has been completed");
 			}
-			else if (n[0].getDef().getId() == 3022){
+			else if (n[0].getDef().getId() == 3022 || n[0].getDef().getId() == 3351 || n[0].getDef().getId() == 40){
 				System.exit(0);
 				System.out.println("A mod called a Genie random onto you.\n" +
 						"The client was closed to protect your account.");
